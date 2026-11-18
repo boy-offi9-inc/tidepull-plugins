@@ -1,0 +1,26 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  plugins:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        plugin: [plugins/_template]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        working-directory: ${{ matrix.plugin }}
+        run: npm install
+      - name: Typecheck
+        working-directory: ${{ matrix.plugin }}
+        run: npm run typecheck
+      - name: Test
+        working-directory: ${{ matrix.plugin }}
+        run: npm test

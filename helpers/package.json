@@ -1,0 +1,11 @@
+{
+  "name": "@boy-offi9-inc/tidepull-helpers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Media-format parsing utilities for Tidepull plugin authors. Never imported by the core.",
+  "main": "./src/index.ts",
+  "scripts": {
+    "test": "node --test \"test/**/*.test.ts\""
+  }
+}
