@@ -2,13 +2,14 @@
 
 Official plugins and authoring helpers for [Tidepull](https://github.com/boy-offi9-inc/Tidepull) — the minimal, zero-dependency media downloader.
 
-**Status: scaffolding. Private until the core plugin loader is stable.**
+**Status: public. Official plugins and authoring helpers for the Tidepull plugin ecosystem.**
 
 ## Layout
 
 ```
 plugins/
-  _template/            Clone-and-go scaffold (apiVersion 1 contract)
+  example/              @boy-offi9-inc/tidepull-plugin-example — og:video /
+                        JSON-LD extractor; the tested template to start from
   youtube/              @boy-offi9-inc/tidepull-plugin-youtube      (planned)
   soundcloud/           @boy-offi9-inc/tidepull-plugin-soundcloud   (planned)
   subtitles/            @boy-offi9-inc/tidepull-plugin-subtitles    (planned)
@@ -42,10 +43,10 @@ parsing belongs in `helpers/`, transport/resilience belongs in
 
 ## Authoring
 
-Start from `plugins/_template/`:
+Start from `plugins/example/` (the tested template):
 
 ```bash
-cp -r plugins/_template plugins/mysite
+cp -r plugins/example plugins/mysite
 cd plugins/mysite
 npm install
 npm test

@@ -20,6 +20,10 @@ export default definePlugin({
 });
 ```
 
+A complete, tested example lives in `plugins/example/` —
+`@boy-offi9-inc/tidepull-plugin-example`. It is the reference implementation
+and the template: copy it, rename it, point `suitable()` at your site.
+
 ## Rules
 
 1. **`apiVersion` must match.** The loader rejects plugins targeting a
@@ -60,8 +64,9 @@ Each directory entry may be a single `.mjs`/`.ts` file or a folder with an
 
 ## Becoming "official"
 
-A community plugin is promoted into this monorepo (and gets the scoped
-`@boy-offi9-inc/tidepull-plugin-<name>` name) when it:
+This repo is public; official plugins live here and carry the scoped
+`@boy-offi9-inc/tidepull-plugin-<name>` name. A community plugin is promoted
+when it:
 
 - passes CI here (typecheck, tests against fixtures, pack)
 - follows the format-metadata rules (rule 5)

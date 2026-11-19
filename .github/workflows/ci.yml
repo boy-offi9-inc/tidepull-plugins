@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        plugin: [plugins/_template]
+        plugin: [plugins/example]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
