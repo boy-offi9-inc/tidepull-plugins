@@ -2,16 +2,27 @@
 
 Official plugins and authoring helpers for [Tidepull](https://github.com/boy-offi9-inc/Tidepull) — the minimal, zero-dependency media downloader.
 
-**Status: public. Official plugins and authoring helpers for the Tidepull plugin ecosystem.**
+[![CI](https://github.com/boy-offi9-inc/tidepull-plugins/actions/workflows/ci.yml/badge.svg)](https://github.com/boy-offi9-inc/tidepull-plugins/actions/workflows/ci.yml)
+[![plugin API: v1](https://img.shields.io/badge/plugin%20API-v1-blue)](docs/PLUGINS.md)
+[![core: @boy-offi9-inc/tidepull](https://img.shields.io/badge/core-%40boy--offi9--inc%2Ftidepull-00b4d8)](https://github.com/boy-offi9-inc/Tidepull)
+[![plugins: 2](https://img.shields.io/badge/plugins-2-90e0ef)](#plugins)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+## Plugins
+
+| Plugin | Package | Extracts |
+|---|---|---|
+| [example](plugins/example) | [@boy-offi9-inc/tidepull-plugin-example](https://www.npmjs.com/package/@boy-offi9-inc/tidepull-plugin-example) | Direct media URLs from `og:video` / `og:audio` metas, JSON-LD `VideoObject`/`AudioObject`, bare `<video src>` |
+| [soundcloud](plugins/soundcloud) | [@boy-offi9-inc/tidepull-plugin-soundcloud](https://www.npmjs.com/package/@boy-offi9-inc/tidepull-plugin-soundcloud) | Progressive streams from public SoundCloud track pages (`og:audio`, JSON-LD `AudioObject`, script data) |
 
 ## Layout
 
 ```
 plugins/
-  example/              @boy-offi9-inc/tidepull-plugin-example — og:video /
-                        JSON-LD extractor; the tested template to start from
+  _template/            Clone-and-go scaffold (apiVersion 1 contract)
+  example/              @boy-offi9-inc/tidepull-plugin-example
+  soundcloud/           @boy-offi9-inc/tidepull-plugin-soundcloud
   youtube/              @boy-offi9-inc/tidepull-plugin-youtube      (planned)
-  soundcloud/           @boy-offi9-inc/tidepull-plugin-soundcloud   (planned)
   subtitles/            @boy-offi9-inc/tidepull-plugin-subtitles    (planned)
 helpers/                @boy-offi9-inc/tidepull-helpers
   src/                  Media-format parsing utilities for plugin authors
@@ -43,10 +54,10 @@ parsing belongs in `helpers/`, transport/resilience belongs in
 
 ## Authoring
 
-Start from `plugins/example/` (the tested template):
+Start from `plugins/_template/`:
 
 ```bash
-cp -r plugins/example plugins/mysite
+cp -r plugins/_template plugins/mysite
 cd plugins/mysite
 npm install
 npm test
