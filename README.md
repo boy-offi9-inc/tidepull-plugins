@@ -10,29 +10,54 @@ Official plugins and authoring helpers for [Tidepull](https://github.com/boy-off
 
 ## Plugins
 
-| Plugin | Package | Extracts |
+Two plugins live here today, both tested offline against fixtures:
+
+| Plugin | Extracts | Install today |
 |---|---|---|
-| [example](plugins/example) | [@boy-offi9-inc/tidepull-plugin-example](https://www.npmjs.com/package/@boy-offi9-inc/tidepull-plugin-example) | Direct media URLs from `og:video` / `og:audio` metas, JSON-LD `VideoObject`/`AudioObject`, bare `<video src>` |
-| [soundcloud](plugins/soundcloud) | [@boy-offi9-inc/tidepull-plugin-soundcloud](https://www.npmjs.com/package/@boy-offi9-inc/tidepull-plugin-soundcloud) | Progressive streams from public SoundCloud track pages (`og:audio`, JSON-LD `AudioObject`, script data) |
+| [example](plugins/example) | Direct media URLs from `og:video` / `og:audio` metas, JSON-LD `VideoObject`/`AudioObject`, bare `<video src>` | copy `plugins/example/index.ts` into `~/.config/tidepull/plugins/`, or pass `--plugin plugins/example/index.ts` |
+| [soundcloud](plugins/soundcloud) | Progressive streams from **public** SoundCloud track pages (`og:audio`, JSON-LD `AudioObject`, script data). No client_id/OAuth — private tracks and catalog search are out of scope | copy `plugins/soundcloud/index.ts` into `~/.config/tidepull/plugins/`, or pass `--plugin plugins/soundcloud/index.ts` |
+
+Neither is on npm yet — the `@boy-offi9-inc/tidepull-plugin-*` package names
+are reserved for when they publish. Until then, plugins load from disk (see
+below). Automatic discovery of npm-installed plugins
+(`node_modules/tidepull-plugin-*`) is a planned core-loader addition, not
+shipped yet.
+
+## Loading a plugin
+
+Tidepull auto-loads every plugin file from `~/.config/tidepull/plugins/`
+(or `TIDEPULL_PLUGIN_DIR`), or load one explicitly:
+
+```bash
+tidepull --plugin ./plugins/soundcloud/index.ts -F <url>
+```
+
+Or programmatically:
+
+```ts
+import { createTidepull } from "@boy-offi9-inc/tidepull";
+import example from "./plugins/example/index.ts";
+const g = createTidepull({ plugins: [example] });
+```
+
+Plugins run before built-ins; the generic fallback is always last. The core
+refuses a plugin with a mismatched `apiVersion` with a clear error.
 
 ## Layout
 
 ```
 plugins/
-  _template/            Clone-and-go scaffold (apiVersion 1 contract)
-  example/              @boy-offi9-inc/tidepull-plugin-example
-  soundcloud/           @boy-offi9-inc/tidepull-plugin-soundcloud
-  youtube/              @boy-offi9-inc/tidepull-plugin-youtube      (planned)
-  subtitles/            @boy-offi9-inc/tidepull-plugin-subtitles    (planned)
+  example/              @boy-offi9-inc/tidepull-plugin-example 0.1.0 (not on npm yet)
+  soundcloud/           @boy-offi9-inc/tidepull-plugin-soundcloud 0.1.0 (not on npm yet)
 helpers/                @boy-offi9-inc/tidepull-helpers
   src/                  Media-format parsing utilities for plugin authors
-                        (HLS manifest walking, DASH MPD parsing, signature
-                        solvers). Plugins may depend on this; the core never.
+                        (parseM3u8 shipped; DASH MPD walking planned).
+                        Plugins may depend on this; the core never.
 fixtures/
-  hls/                  Sample m3u8 manifests (VOD, AES-128, live)
-  dash/                 Sample MPD manifests (static, segment-template)
+  hls/                  Sample m3u8 manifests (docs first; manifests to be added)
+  dash/                 Sample MPD manifests (docs first; manifests to be added)
 docs/
-  PLUGINS.md            The plugin contract, authoring guide, review policy
+  PLUGINS.md            The plugin contract, authoring guide, promotion policy
 .github/workflows/      One CI lane: typecheck + test + pack every plugin
 ```
 
@@ -48,16 +73,18 @@ error — see `PLUGIN_API_VERSION` in the core repo.
 ## The rule that keeps the core thin
 
 Plugins may depend on anything. The core never grows a dependency because a
-site is hard — hard sites become plugins. Helpers live here too: media-format
-parsing belongs in `helpers/`, transport/resilience belongs in
+site is hard — hard sites become plugins. Media-format parsing helpers belong
+in `helpers/` here; transport/resilience belongs in
 [reqkit](https://github.com/boy-offi9-inc/reqkit).
 
 ## Authoring
 
-Start from `plugins/_template/`:
+There is no separate scaffold — `plugins/example/` is the living template.
+Copy it, rename the plugin, and follow the contract in
+[`docs/PLUGINS.md`](docs/PLUGINS.md):
 
 ```bash
-cp -r plugins/_template plugins/mysite
+cp -r plugins/example plugins/mysite
 cd plugins/mysite
 npm install
 npm test

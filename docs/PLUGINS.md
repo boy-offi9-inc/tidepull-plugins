@@ -64,7 +64,7 @@ Each directory entry may be a single `.mjs`/`.ts` file or a folder with an
 
 ## Becoming "official"
 
-This repo is public; official plugins live here and carry the scoped
+Official plugins live here and carry the scoped
 `@boy-offi9-inc/tidepull-plugin-<name>` name. A community plugin is promoted
 when it:
 
