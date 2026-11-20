@@ -1,10 +1,10 @@
 name: Publish plugins
 
-# Publishes every plugin under plugins/ whose package.json version changed.
-# Gate: compare the local version against the published one on npm; equal =
-# skip (green notice, no failure). Changed = typecheck + test, then publish.
-# Same convention as the core Tidepull repo: secret NPM_TOKEN (an
-# automation-type token, so npm does not demand an OTP in CI).
+# Publishes every plugin under plugins/ whose package.json version differs from
+# the version already on npm. Equal = skipped (green notice). Different = that
+# one plugin gets typecheck + test + publish. Adding a 21st plugin needs no
+# change here: drop the folder in, bump its version, push.
+# Secret: NPM_TOKEN (automation type, so npm does not demand an OTP in CI).
 
 on:
   push:
@@ -25,42 +25,50 @@ jobs:
       changed: ${{ steps.changes.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - name: Detect changed plugin versions
+      - name: Detect unpublished plugin versions
         id: changes
         run: |
-          changed=""
-          for dir in plugins/*/; do
-            [ -f "$dir/package.json" ] || continue
-            name=$(node -p "require('./$dir/package.json').name")
-            local=$(node -p "require('./$dir/package.json').version")
-            published=$(npm view "$name" version 2>/dev/null || echo none)
-            if [ "$local" != "$published" ]; then
-              echo "::notice::$name: $published -> $local"
-              changed="$changed $dir"
-            else
-              echo "::notice::$name@$local already published - skipping"
-            fi
-          done
-          echo "changed=$(echo $changed)" >> "$GITHUB_OUTPUT"
+          node -e '
+            const fs = require("fs");
+            const cp = require("child_process");
+            const dirs = fs.readdirSync("plugins").filter((d) =>
+              fs.existsSync(`plugins/${d}/package.json`));
+            const changed = [];
+            for (const d of dirs) {
+              const pkg = JSON.parse(fs.readFileSync(`plugins/${d}/package.json`, "utf8"));
+              let published = "none";
+              try {
+                published = cp.execSync(`npm view ${pkg.name} version`,
+                  { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+              } catch {}
+              if (published === pkg.version) {
+                console.log(`${pkg.name}@${pkg.version} already published - skipping`);
+              } else {
+                console.log(`${pkg.name}: ${published} -> ${pkg.version}`);
+                changed.push(`plugins/${d}`);
+              }
+            }
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `changed=${JSON.stringify(changed)}\n`);
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+              `| Plugin | Action |\n|---|---|\n` +
+              (changed.length ? changed.map((c) => `| ${c} | publish |`).join("\n")
+                              : "| - | nothing to publish |") + "\n");
+          '
 
   publish:
     needs: detect
-    if: needs.detect.outputs.changed != ''
+    if: needs.detect.outputs.changed != '[]' && needs.detect.outputs.changed != ''
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        plugin: ${{ needs.detect.outputs.changed }}
       fail-fast: false
+      matrix:
+        plugin: ${{ fromJSON(needs.detect.outputs.changed) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-          cache: npm
-          cache-dependency-path: ${{ matrix.plugin }}/package-lock.json
       - name: Install
         working-directory: ${{ matrix.plugin }}
         run: npm install
