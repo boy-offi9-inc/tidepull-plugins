@@ -13,11 +13,16 @@ already contains: `videoDetails` for metadata, `streamingData` for
 
 - **Public videos only.** Private, unlisted, members-only and
   purchase-required content is never touched and cannot be reached this way.
-- **No signature deciphering.** Some pages (bot-gated, age-restricted, and
-  increasingly the default for logged-out requests) serve formats whose URLs
-  need YouTube's `n`-parameter challenge solved in JS. This plugin
-  deliberately does not implement that: such pages fail with a clear
-  `TidepullError` explaining why, instead of silently producing dead URLs.
+- **n-challenge deciphering is implemented** (v0.2.0): when formats carry an
+  enciphered `n` parameter, the plugin fetches YouTube's player JS and solves
+  the challenge locally via yt-dlp's official ejs solver core
+  (`yt.solver.core.js`, Unlicense) bundled with meriyah + astring — no
+  external runtime, no network round-trips beyond the player JS itself. If
+  solving fails (player rotation, missing player URL), enciphered formats are
+  skipped and the error says so — dead URLs are never served.
+- **No `s`-signature deciphering.** Formats delivered as `signatureCipher`
+  (rare, mostly for web-compat) are still skipped: only the `n` challenge is
+  solved.
 - **No live/DVR or post-live content.** `liveBroadcastContent != "none"`
   throws with a clear error.
 - **No age-gate bypass.** Age-restricted videos are refused, not worked
@@ -29,6 +34,19 @@ already contains: `videoDetails` for metadata, `streamingData` for
   `acodec: "none"` respectively); muxing is Tidepull's job, not this
   plugin's.
 
+## Standalone bundle
+
+For drop-in use without node_modules, a single-file build is generated:
+
+```bash
+node scripts/build-standalone.mjs   # writes dist-youtube.ts (~180 KB)
+```
+
+`dist-youtube.ts` inlines meriyah (ISC), astring (MIT) and the yt-dlp ejs
+solver core (Unlicense) as strings — copy it into `~/.config/tidepull/plugins/`
+as `youtube.ts` and it works with zero extra dependencies. Regenerate it after
+updating any of the three vendored pieces.
+
 ## Test
 
 ```bash
@@ -36,4 +54,5 @@ npm install
 npm run typecheck && npm test
 ```
 
-Tests run fully offline against a fixture player response; no network access.
+Tests run fully offline against fixture player responses and a synthetic
+player JS; no network access.

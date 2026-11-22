@@ -1,4 +1,5 @@
 import { definePlugin, TidepullError, type Info } from "@boy-offi9-inc/tidepull";
+import { solveNChallenges, encipheredN, applyN } from "./nsig.ts";
 
 /** Extracts stream URLs from public YouTube video pages.
  *
@@ -43,10 +44,31 @@ export default definePlugin({
 
         const formats: Info["formats"] = [];
 
-        // Progressive + adaptive streams from playerResponse.formats / adaptiveFormats.
+        // Collect raw candidate formats first; decipher the n challenge in bulk.
+        const raw: Array<{ f: any; n?: string }> = [];
         for (const f of [...(player.formats ?? []), ...(player.adaptiveFormats ?? [])]) {
-          if (typeof f.url !== "string") continue; // signatureCipher without a plain url: skipped, not deciphered
-          if (f.url.includes("&n=") && isEncipheredN(f.url)) continue;
+          if (typeof f.url !== "string") continue; // signatureCipher-only: s-decipher, still out of scope
+          raw.push({ f, n: encipheredN(f.url) });
+        }
+
+        const playerUrl = findPlayerUrl(html);
+        if (raw.some((r) => r.n) && playerUrl) {
+          try {
+            const solved = await solveNChallenges(raw.filter((r) => r.n).map((r) => r.n!), playerUrl, ctx.signal);
+            for (const r of raw) {
+              if (r.n && solved.has(r.n)) {
+                r.f = { ...r.f, url: applyN(r.f.url, solved.get(r.n)!) };
+                r.n = undefined;
+              }
+            }
+            ctx.log.debug(`n-challenge: solved ${solved.size} challenge(s) via player JS`);
+          } catch (e) {
+            ctx.log.debug(`n-challenge solving failed: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+
+        for (const { f, n } of raw) {
+          if (n) continue; // still enciphered after solving attempt: skip, don't serve dead URLs
           addFormat(formats, f);
         }
 
@@ -114,6 +136,12 @@ function canonicalUrl(url: URL): URL {
     return out;
   }
   return url;
+}
+
+/** Locate the player JS URL: "js":"/s/player/<id>/..." in the page (ytcfg or player response). */
+function findPlayerUrl(html: string): string | undefined {
+  const m = /"js":"(\/s\/player\/[^"]+\.js)"/.exec(html) ?? /"PLAYER_JS_URL":"(\/s\/player\/[^"]+\.js)"/.exec(html);
+  return m?.[1];
 }
 
 /** Parse `ytInitialPlayerResponse = {...};` out of the served HTML. */
