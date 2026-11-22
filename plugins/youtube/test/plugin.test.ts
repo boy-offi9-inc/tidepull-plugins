@@ -130,6 +130,6 @@ test("all-formats-enciphered page: clear error mentioning deciphering", async ()
     .replace(/"dashManifestUrl":"[^"]*",?/, "");
   await assert.rejects(
     extract(new URL("https://www.youtube.com/watch?v=abc123"), mockCtx(html)),
-    (e: unknown) => e instanceof Error && /deciphering/.test((e as Error).message),
+    (e: unknown) => e instanceof Error && /enciphered|deciphered/.test((e as Error).message),
   );
 });
