@@ -13,16 +13,14 @@ already contains: `videoDetails` for metadata, `streamingData` for
 
 - **Public videos only.** Private, unlisted, members-only and
   purchase-required content is never touched and cannot be reached this way.
-- **n-challenge deciphering is implemented** (v0.2.0): when formats carry an
-  enciphered `n` parameter, the plugin fetches YouTube's player JS and solves
-  the challenge locally via yt-dlp's official ejs solver core
+- **n-challenge and s-signature deciphering are implemented** (v0.2.0 for `n`,
+  v0.3.0 for `s`): when formats carry an enciphered `n` parameter or a
+  `signatureCipher` (`s`/`sp`/`url`), the plugin fetches YouTube's player JS
+  and solves both challenges locally via yt-dlp's official ejs solver core
   (`yt.solver.core.js`, Unlicense) bundled with meriyah + astring — no
   external runtime, no network round-trips beyond the player JS itself. If
   solving fails (player rotation, missing player URL), enciphered formats are
   skipped and the error says so — dead URLs are never served.
-- **No `s`-signature deciphering.** Formats delivered as `signatureCipher`
-  (rare, mostly for web-compat) are still skipped: only the `n` challenge is
-  solved.
 - **No live/DVR or post-live content.** `liveBroadcastContent != "none"`
   throws with a clear error.
 - **No age-gate bypass.** Age-restricted videos are refused, not worked

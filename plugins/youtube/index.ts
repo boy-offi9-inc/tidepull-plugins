@@ -128,8 +128,8 @@ export default definePlugin({
 
         if (formats.length === 0) {
           throw new TidepullError(
-            "No downloadable stream found: every format YouTube served needs signature deciphering (or the video " +
-            "has none). Tidepull's youtube plugin does not implement deciphering by design — see the README for why.",
+            "No downloadable stream found: every format YouTube served is enciphered and could not be " +
+            "deciphered (player rotation or no player URL), or the video has none. See the README.",
           );
         }
 
