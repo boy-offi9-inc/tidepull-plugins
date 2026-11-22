@@ -1,17 +1,30 @@
 {
   "name": "@boy-offi9-inc/tidepull-plugin-youtube",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
-  "description": "Tidepull plugin: extracts stream URLs from public YouTube videos and shorts (ytInitialPlayerResponse, DASH/HLS manifests). No signature deciphering by design.",
+  "description": "Tidepull plugin: extracts stream URLs from public YouTube videos and shorts, solving the n-challenge locally via yt-dlp's ejs solver core. No s-signature deciphering, no bot-wall bypass.",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/boy-offi9-inc/tidepull-plugins.git"
   },
-  "main": "./index.ts",
+  "main": "./dist-youtube.ts",
+  "exports": {
+    ".": "./dist-youtube.ts",
+    "./source": "./index.ts"
+  },
+  "files": [
+    "dist-youtube.ts",
+    "solver-source.ts",
+    "nsig.ts",
+    "index.ts",
+    "yt.solver.core.js",
+    "README.md"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test \"test/**/*.test.ts\""
+    "test": "node --test \"test/**/*.test.ts\"",
+    "build": "node scripts/build-standalone.mjs"
   },
   "keywords": [
     "tidepull",
@@ -21,7 +34,7 @@
     "video"
   ],
   "peerDependencies": {
-    "@boy-offi9-inc/tidepull": "^0.4.0"
+    "@boy-offi9-inc/tidepull": ">=0.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
