@@ -1,0 +1,30 @@
+{
+  "name": "@boy-offi9-inc/tidepull-plugin-youtube",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Tidepull plugin: extracts stream URLs from public YouTube videos and shorts (ytInitialPlayerResponse, DASH/HLS manifests). No signature deciphering by design.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/boy-offi9-inc/tidepull-plugins.git"
+  },
+  "main": "./index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\""
+  },
+  "keywords": [
+    "tidepull",
+    "tidepull-plugin",
+    "downloader",
+    "youtube",
+    "video"
+  ],
+  "peerDependencies": {
+    "@boy-offi9-inc/tidepull": "^0.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  }
+}

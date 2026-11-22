@@ -16,8 +16,9 @@ Two plugins live here today, both tested offline against fixtures:
 |---|---|---|
 | [example](plugins/example) | Direct media URLs from `og:video` / `og:audio` metas, JSON-LD `VideoObject`/`AudioObject`, bare `<video src>` | copy `plugins/example/index.ts` into `~/.config/tidepull/plugins/`, or pass `--plugin plugins/example/index.ts` |
 | [soundcloud](plugins/soundcloud) | Progressive streams from **public** SoundCloud track pages (`og:audio`, JSON-LD `AudioObject`, script data). No client_id/OAuth — private tracks and catalog search are out of scope | copy `plugins/soundcloud/index.ts` into `~/.config/tidepull/plugins/`, or pass `--plugin plugins/soundcloud/index.ts` |
+| [youtube](plugins/youtube) | Progressive + adaptive streams from **public** YouTube video pages (`ytInitialPlayerResponse`). Honest scope: no signature deciphering — pages whose formats are all enciphered (bot-gated, age-restricted) fail with a clear error; live/DVR content not supported | copy `plugins/youtube/index.ts` into `~/.config/tidepull/plugins/`, or pass `--plugin plugins/youtube/index.ts` |
 
-Neither is on npm yet — the `@boy-offi9-inc/tidepull-plugin-*` package names
+None of these are on npm yet — the `@boy-offi9-inc/tidepull-plugin-*` package names
 are reserved for when they publish. Until then, plugins load from disk (see
 below). Automatic discovery of npm-installed plugins
 (`node_modules/tidepull-plugin-*`) is a planned core-loader addition, not
@@ -49,6 +50,7 @@ refuses a plugin with a mismatched `apiVersion` with a clear error.
 plugins/
   example/              @boy-offi9-inc/tidepull-plugin-example 0.1.0 (not on npm yet)
   soundcloud/           @boy-offi9-inc/tidepull-plugin-soundcloud 0.1.0 (not on npm yet)
+  youtube/              @boy-offi9-inc/tidepull-plugin-youtube 0.1.0 (not on npm yet)
 helpers/                @boy-offi9-inc/tidepull-helpers
   src/                  Media-format parsing utilities for plugin authors
                         (parseM3u8 shipped; DASH MPD walking planned).
