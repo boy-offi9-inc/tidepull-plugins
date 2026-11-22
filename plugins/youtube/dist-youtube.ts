@@ -1726,7 +1726,11 @@ export default definePlugin({
       suitable: (url) => suitable(url),
       async extract(url, ctx) {
         const canonical = canonicalUrl(url);
-        const page = await ctx.http.text(canonical.href);
+        // Send a real browser UA: YouTube serves bot-ish UAs a stripped mweb page whose
+        // player response has no streaming data at all.
+        const page = await ctx.http.text(canonical.href, {
+          headers: { "user-agent": "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36", "accept-language": "en" },
+        });
         const html = page.text;
 
         const player = playerResponse(html);
@@ -1835,8 +1839,8 @@ export default definePlugin({
 
         if (formats.length === 0) {
           throw new TidepullError(
-            "No downloadable stream found: every format YouTube served needs signature deciphering (or the video " +
-            "has none). Tidepull's youtube plugin does not implement deciphering by design — see the README for why.",
+            "No downloadable stream found: every format YouTube served is enciphered and could not be " +
+            "deciphered (player rotation or no player URL), or the video has none. See the README.",
           );
         }
 
@@ -1893,15 +1897,30 @@ function findPlayerUrl(html: string): string | undefined {
   return m?.[1];
 }
 
-/** Parse `ytInitialPlayerResponse = {...};` out of the served HTML. */
+/** Parse `ytInitialPlayerResponse = {...};` out of the served HTML.
+ *  mweb pages embed `= null;` first, then the real JSON — and the real JSON may end
+ *  before `;` boundaries the old regex expected. Brace-count every assignment and
+ *  prefer the object that actually carries streaming data. */
 function playerResponse(html: string): any | undefined {
-  const m = /ytInitialPlayerResponse\s*=\s*(\{.+?\})\s*;\s*(?:var|const|let|<\/script>|if)/s.exec(html);
-  if (!m) return undefined;
-  try {
-    return JSON.parse(balancedJson(html, m.index + m[0].indexOf("{")));
-  } catch {
-    return undefined;
+  const candidates: any[] = [];
+  const assign = /ytInitialPlayerResponse\s*=\s*/g;
+  for (let m: RegExpExecArray | null; (m = assign.exec(html));) {
+    const rest = html.slice(m.index + m[0].length);
+    if (!rest.startsWith("{")) continue; // `= null;` etc.
+    let json: string;
+    try {
+      json = balancedJson(html, m.index + m[0].length);
+    } catch {
+      continue;
+    }
+    try {
+      candidates.push(JSON.parse(json));
+    } catch {
+      // truncated object — skip
+    }
   }
+  const withFormats = candidates.find((p) => (p?.streamingData?.formats?.length ?? 0) + (p?.streamingData?.adaptiveFormats?.length ?? 0) > 0);
+  return withFormats ?? candidates[0];
 }
 
 /** Walk from a `{` to its matching `}` respecting strings and escapes. */

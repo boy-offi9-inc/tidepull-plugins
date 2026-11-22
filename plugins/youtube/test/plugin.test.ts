@@ -133,3 +133,24 @@ test("all-formats-enciphered page: clear error mentioning deciphering", async ()
     (e: unknown) => e instanceof Error && /enciphered|deciphered/.test((e as Error).message),
   );
 });
+
+test("mweb page shape: null assignment then real JSON is parsed correctly", async () => {
+  const player = {
+    videoDetails: { videoId: "abc", title: "T" },
+    playabilityStatus: { status: "OK" },
+    streamingData: {
+      formats: [{ itag: 18, mimeType: "video/mp4", url: "https://cf.example/videoplayback?id=xyz&n=shortA" }],
+      adaptiveFormats: [],
+    },
+  };
+  // mweb pages embed a null assignment first, then the real JSON ending with a sourceURL comment
+  const html = `<script nonce="x">ytInitialPlayerResponse = null;//# sourceURL=yt-mweb-initial-player-response.js</script>` +
+    `<script>var ytcfg={"a":1};</script>` +
+    `<script>ytInitialPlayerResponse = ${JSON.stringify(player)};//# sourceURL=yt-mweb-player.js</script>`;
+  const ex = plugin.extractors![0];
+  const info = (await ex.extract(new URL("https://www.youtube.com/watch?v=abc123"), {
+    http: { async text() { return { text: html, finalUrl: "https://www.youtube.com/watch?v=abc123" }; } },
+    log: { debug() {}, info() {}, warn() {} },
+  } as never)) as { formats: Array<{ url: string }> };
+  assert.equal(info.formats.length, 1, "formats found despite the leading null assignment");
+});

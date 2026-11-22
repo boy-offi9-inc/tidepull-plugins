@@ -1,8 +1,8 @@
 {
   "name": "@boy-offi9-inc/tidepull-plugin-youtube",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
-  "description": "Tidepull plugin: extracts stream URLs from public YouTube videos and shorts (ytInitialPlayerResponse, DASH/HLS manifests) with full n-challenge + s-signature deciphering (yt-dlp ejs solver core).",
+  "description": "Tidepull plugin: extracts stream URLs from public YouTube videos and shorts with n-challenge + s-signature deciphering (yt-dlp ejs solver core) and browser-UA page fetching.",
   "license": "MIT",
   "repository": {
     "type": "git",
