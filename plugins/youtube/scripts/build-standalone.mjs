@@ -29,10 +29,18 @@ astringBody = astringBody.replace(/export \{[^}]*\};?\s*$/, "");
 const meriyahBody = meriyahSrc.replace(/export\{[^}]*\};?\s*$/, "");
 
 // nsig.ts: drop the imports; replace loadSolver body with inline construction
-let nsig = nsigSrc.replace(
-  'import { createRequire } from "node:module";\nimport { SOLVER_SOURCE } from "./solver-source.ts";\n\nconst require = createRequire(import.meta.url);\n',
-  "",
-);
+let nsig = nsigSrc
+  .replace(
+    'import { createRequire } from "node:module";\nimport { SOLVER_SOURCE } from "./solver-source.ts";\n\nconst require = createRequire(import.meta.url);\n',
+    "",
+  )
+  .replace(
+    'import { createRequire } from "node:module";\nimport { SOLVER_SOURCE } from "./solver-source.ts";\n\nconst require = createRequire(import.meta.url);\n\n',
+    "",
+  )
+  .replace(/^import { SOLVER_SOURCE } from "\.\/solver-source\.ts";\n/m, "")
+  .replace(/^import { createRequire } from "node:module";\n/m, "")
+  .replace(/^const require = createRequire\(import\.meta\.url\);\n/m, "");
 const loadSolverRe = /function loadSolver\(\):[\s\S]*?\n}\n/;
 nsig = nsig.replace(loadSolverRe, `function loadSolver(): NonNullable<typeof solverState> {
   const INLINED = (() => {

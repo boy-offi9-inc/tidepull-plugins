@@ -1609,7 +1609,6 @@ function generate(node, options) {
  * Fails soft: any error means formats keep their enciphered n and the plugin
  * reports honestly (no fake deciphered URLs).
  */
-import { SOLVER_SOURCE } from "./solver-source.ts";
 
 // Lazily constructed singleton: { jsc, cache }
 let solverState: { jsc: (input: unknown) => SolverOutput; cache: Map<string, string> } | undefined;

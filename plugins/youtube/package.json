@@ -1,6 +1,6 @@
 {
   "name": "@boy-offi9-inc/tidepull-plugin-youtube",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "Tidepull plugin: extracts stream URLs from public YouTube videos and shorts (ytInitialPlayerResponse, DASH/HLS manifests). No signature deciphering by design.",
   "license": "MIT",
