@@ -1645,18 +1645,19 @@ async function fetchPlayerJs(playerUrl: string, signal?: AbortSignal): Promise<s
 }
 
 /**
- * Solve a batch of n challenges for a given player URL.
+ * Solve a batch of n challenges OR s signatures for a given player URL.
+ * kind: "n" for the n-parameter challenge, "sig" for the s signature.
  * Returns a Map<challenge, solved>. Throws on hard failure — caller decides
  * whether to skip those formats or error out.
  */
-export async function solveNChallenges(challenges: string[], playerUrl: string, signal?: AbortSignal): Promise<Map<string, string>> {
+export async function solveChallenges(challenges: string[], playerUrl: string, kind: "n" | "sig", signal?: AbortSignal): Promise<Map<string, string>> {
   const unique = [...new Set(challenges)];
   const state = loadSolver();
 
   const out = new Map<string, string>();
   const pending: string[] = [];
   for (const c of unique) {
-    const key = `${playerUrl}::${c}`;
+    const key = `${kind}:${playerUrl}::${c}`;
     const cached = state.cache.get(key);
     if (cached !== undefined) out.set(c, cached);
     else pending.push(c);
@@ -1668,24 +1669,28 @@ export async function solveNChallenges(challenges: string[], playerUrl: string, 
   const result = state.jsc({
     type: "player",
     player: playerJs,
-    requests: [{ type: "n", challenges: pending }],
+    requests: [{ type: kind, challenges: pending }],
   });
   if (result.type !== "result") throw new Error(`solver failed: ${JSON.stringify(result).slice(0, 200)}`);
   for (const resp of result.responses) {
     if (resp.type === "result" && resp.data) {
       for (const [challenge, solved] of Object.entries(resp.data)) {
-        state.cache.set(`${playerUrl}::${challenge}`, solved);
+        state.cache.set(`${kind}:${playerUrl}::${challenge}`, solved);
         out.set(challenge, solved);
       }
     } else {
-      throw new Error(`n-solve failed: ${resp.error ?? "unknown"}`);
+      throw new Error(`${kind}-solve failed: ${resp.error ?? "unknown"}`);
     }
   }
   for (const c of pending) {
-    if (!out.has(c)) throw new Error(`n-solve missing result for challenge ${c}`);
+    if (!out.has(c)) throw new Error(`${kind}-solve missing result for challenge ${c}`);
   }
   return out;
 }
+
+/** Back-compat: n-challenge solving. */
+export const solveNChallenges = (challenges: string[], playerUrl: string, signal?: AbortSignal) =>
+  solveChallenges(challenges, playerUrl, "n", signal);
 
 /** True when the URL carries an enciphered n challenge. */
 export function encipheredN(u: string): string | undefined {
@@ -1746,14 +1751,50 @@ export default definePlugin({
 
         const formats: Info["formats"] = [];
 
-        // Collect raw candidate formats first; decipher the n challenge in bulk.
-        const raw: Array<{ f: any; n?: string }> = [];
-        for (const f of [...(player.formats ?? []), ...(player.adaptiveFormats ?? [])]) {
-          if (typeof f.url !== "string") continue; // signatureCipher-only: s-decipher, still out of scope
-          raw.push({ f, n: encipheredN(f.url) });
+        // Collect raw candidate formats first; decipher n and s in bulk.
+        const raw: Array<{ f: any; n?: string; s?: string; sp?: string }> = [];
+        const sd = player.streamingData ?? {};
+        for (const f of [...(player.formats ?? []), ...(sd.formats ?? []), ...(player.adaptiveFormats ?? []), ...(sd.adaptiveFormats ?? [])]) {
+          if (typeof f.url === "string") {
+            raw.push({ f, n: encipheredN(f.url) });
+            continue;
+          }
+          // signatureCipher: s must be deciphered, then appended per sp (default "s...&sig=")
+          const cipher = f.signatureCipher ?? f.cipher;
+          if (typeof cipher !== "string") continue;
+          const params = new URLSearchParams(cipher);
+          const s = params.get("s") ?? undefined;
+          if (!s || s.length <= 2 || !params.get("url")) continue; // nothing to decipher
+          raw.push({ f: { ...f, _cipherUrl: params.get("url")! }, s, sp: params.get("sp") ?? "signature" });
         }
 
         const playerUrl = findPlayerUrl(html);
+        ctx.log.debug(`player url: ${playerUrl ?? "(none)"} | raw formats: ${raw.length} | with s: ${raw.filter((r) => r.s).length} | with n: ${raw.filter((r) => r.n).length}`);
+
+        // s-signature deciphering first (rewrites the base URL), then n on the result.
+        if (raw.some((r) => r.s) && playerUrl) {
+          try {
+            const solved = await solveChallenges(raw.filter((r) => r.s).map((r) => r.s!), playerUrl, "sig", ctx.signal);
+            for (const r of raw) {
+              if (r.s && solved.has(r.s)) {
+                const base = new URL((r.f as any)._cipherUrl);
+                base.searchParams.set(r.sp === "sig" ? "sig" : r.sp ?? "sig", solved.get(r.s)!);
+                if (r.sp && r.sp !== "sig") base.searchParams.set(r.sp, solved.get(r.s)!);
+                r.f = { ...r.f, url: base.toString() };
+                delete (r.f as any)._cipherUrl;
+                r.s = undefined;
+              }
+            }
+            ctx.log.debug(`s-signature: solved ${solved.size} signature(s) via player JS`);
+          } catch (e) {
+            ctx.log.debug(`s-signature solving failed: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+
+        // n-challenge on whatever URLs survived (cipher formats only get n after s-decipher).
+        for (const r of raw) {
+          if (!r.n && typeof r.f.url === "string") r.n = encipheredN(r.f.url);
+        }
         if (raw.some((r) => r.n) && playerUrl) {
           try {
             const solved = await solveNChallenges(raw.filter((r) => r.n).map((r) => r.n!), playerUrl, ctx.signal);
@@ -1769,8 +1810,10 @@ export default definePlugin({
           }
         }
 
-        for (const { f, n } of raw) {
-          if (n) continue; // still enciphered after solving attempt: skip, don't serve dead URLs
+        for (const { f, n, s } of raw) {
+          if (s) { ctx.log.debug(`s still enciphered after solving, dropping itag ${f.itag}`); continue; }
+          if (n) { ctx.log.debug(`n still enciphered after solving, dropping itag ${f.itag}`); continue; }
+          if (!f.url) { ctx.log.debug(`no url after deciphering, dropping itag ${f.itag}`); continue; }
           addFormat(formats, f);
         }
 
@@ -1842,7 +1885,11 @@ function canonicalUrl(url: URL): URL {
 
 /** Locate the player JS URL: "js":"/s/player/<id>/..." in the page (ytcfg or player response). */
 function findPlayerUrl(html: string): string | undefined {
-  const m = /"js":"(\/s\/player\/[^"]+\.js)"/.exec(html) ?? /"PLAYER_JS_URL":"(\/s\/player\/[^"]+\.js)"/.exec(html);
+  const m =
+    /"js":"(\/s\/player\/[^"]+\.js)"/.exec(html) ??
+    /"PLAYER_JS_URL":"(\/s\/player\/[^"]+\.js)"/.exec(html) ??
+    /"jsUrl":"(\/s\/player\/[^"]+\.js)"/.exec(html) ??
+    /(\/s\/player\/[0-9a-f]{8,}\/player[^"']+\.js)/.exec(html);
   return m?.[1];
 }
 

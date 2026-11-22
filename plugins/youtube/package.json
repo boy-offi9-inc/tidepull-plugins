@@ -1,8 +1,8 @@
 {
   "name": "@boy-offi9-inc/tidepull-plugin-youtube",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "type": "module",
-  "description": "Tidepull plugin: extracts stream URLs from public YouTube videos and shorts, solving the n-challenge locally via yt-dlp's ejs solver core. No s-signature deciphering, no bot-wall bypass.",
+  "description": "Tidepull plugin: extracts stream URLs from public YouTube videos and shorts (ytInitialPlayerResponse, DASH/HLS manifests) with full n-challenge + s-signature deciphering (yt-dlp ejs solver core).",
   "license": "MIT",
   "repository": {
     "type": "git",

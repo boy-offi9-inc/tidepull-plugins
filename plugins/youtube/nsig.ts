@@ -49,18 +49,19 @@ async function fetchPlayerJs(playerUrl: string, signal?: AbortSignal): Promise<s
 }
 
 /**
- * Solve a batch of n challenges for a given player URL.
+ * Solve a batch of n challenges OR s signatures for a given player URL.
+ * kind: "n" for the n-parameter challenge, "sig" for the s signature.
  * Returns a Map<challenge, solved>. Throws on hard failure — caller decides
  * whether to skip those formats or error out.
  */
-export async function solveNChallenges(challenges: string[], playerUrl: string, signal?: AbortSignal): Promise<Map<string, string>> {
+export async function solveChallenges(challenges: string[], playerUrl: string, kind: "n" | "sig", signal?: AbortSignal): Promise<Map<string, string>> {
   const unique = [...new Set(challenges)];
   const state = loadSolver();
 
   const out = new Map<string, string>();
   const pending: string[] = [];
   for (const c of unique) {
-    const key = `${playerUrl}::${c}`;
+    const key = `${kind}:${playerUrl}::${c}`;
     const cached = state.cache.get(key);
     if (cached !== undefined) out.set(c, cached);
     else pending.push(c);
@@ -72,24 +73,28 @@ export async function solveNChallenges(challenges: string[], playerUrl: string, 
   const result = state.jsc({
     type: "player",
     player: playerJs,
-    requests: [{ type: "n", challenges: pending }],
+    requests: [{ type: kind, challenges: pending }],
   });
   if (result.type !== "result") throw new Error(`solver failed: ${JSON.stringify(result).slice(0, 200)}`);
   for (const resp of result.responses) {
     if (resp.type === "result" && resp.data) {
       for (const [challenge, solved] of Object.entries(resp.data)) {
-        state.cache.set(`${playerUrl}::${challenge}`, solved);
+        state.cache.set(`${kind}:${playerUrl}::${challenge}`, solved);
         out.set(challenge, solved);
       }
     } else {
-      throw new Error(`n-solve failed: ${resp.error ?? "unknown"}`);
+      throw new Error(`${kind}-solve failed: ${resp.error ?? "unknown"}`);
     }
   }
   for (const c of pending) {
-    if (!out.has(c)) throw new Error(`n-solve missing result for challenge ${c}`);
+    if (!out.has(c)) throw new Error(`${kind}-solve missing result for challenge ${c}`);
   }
   return out;
 }
+
+/** Back-compat: n-challenge solving. */
+export const solveNChallenges = (challenges: string[], playerUrl: string, signal?: AbortSignal) =>
+  solveChallenges(challenges, playerUrl, "n", signal);
 
 /** True when the URL carries an enciphered n challenge. */
 export function encipheredN(u: string): string | undefined {

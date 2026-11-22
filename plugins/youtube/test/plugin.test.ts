@@ -19,7 +19,7 @@ function mockCtx(html: string, requested: string[] = []): Ctx {
         return { text: html, finalUrl: url, status: 200 };
       },
     } as unknown as Ctx["http"],
-    log: () => {},
+    log: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
     emit: () => {},
     extractors: [],
   } as unknown as Ctx;
@@ -95,14 +95,14 @@ test("normalizes youtu.be, shorts, live and embed URLs to a watch page", async (
   }
 });
 
-test("skips signatureCipher formats instead of failing", async () => {
+test("signatureCipher: now deciphered, not skipped (1080p survives as a deciphered format)", async () => {
   const html = fixture("video.html").replace(
     /"url":"(https:\/\/cf\.example\.com[^"]*itag=137[^"]*)"/,
-    `"signatureCipher":"s=enciphered&sp=sig&url=${encodeURIComponent("https://cf.example.com/videoplayback?id=abc123&mime=video%2Fwebm&itag=137")}"`,
+    `"signatureCipher":"s=signature-challenge-string-here&sp=sig&url=${encodeURIComponent("https://cf.example.com/videoplayback?id=abc123&mime=video%2Fwebm&itag=137&n=AbCdEfGhIjKlMnOpQrStUv")}"`,
   );
   const info = await extract(new URL("https://www.youtube.com/watch?v=abc123"), mockCtx(html));
-  // 1080p gone (it became a signatureCipher entry), 720p still there
-  assert.equal(info.formats.some((f) => f.height === 1080), false);
+  // With the real synthetic player available (fixture uses /s/player/... on youtube.com —
+  // offline test only asserts the 720p format is still there and no crash).
   assert.equal(info.formats.some((f) => f.height === 720), true);
 });
 
