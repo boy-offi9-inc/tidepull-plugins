@@ -39,16 +39,26 @@ export default definePlugin({
           }
         }
 
-        for (const m of html.matchAll(/"url":"(https:\/\/[^"]*\/(?:progressive|stream)[^"]*)"/g)) {
+        for (const m of html.matchAll(/"url":"(https:\/\/[^"]*\/(?:progressive|stream|media\/)[^"]*)"/g)) {
+          // JSON string unescape handles \/ and \u0026 (&) in the app-config URLs
           addFormat(formats, JSON.parse(`"${m[1]}"`) as string, url, "script-data", bitrateFrom(m[1]));
         }
 
         // Media endpoints (/media/.../stream/hls) answer 401 without the frontend's
-        // client_id. Scrape it from the page's own JS assets, then resolve each
-        // endpoint to its real stream URL (progressive file or HLS playlist).
+        // client_id. The new (Next.js) web app embeds it INLINE in the page HTML
+        // (client_id=<32hex> in the app config); older layouts carried it in the
+        // served JS assets — try inline first, then assets.
         const mediaEndpoints = formats.filter((f) => /\/media\/.+\/(?:stream|progressive)/.test(f.url));
         if (mediaEndpoints.length > 0) {
-          const clientId = await findClientId(html, ctx);
+          const inlineId = /client_id[=":\s]+([0-9a-zA-Z]{32})/.exec(html)?.[1];
+          const clientId = inlineId ?? (await findClientId(html, ctx));
+          if (!clientId) {
+            throw new TidepullError(
+              "Found /media/ stream endpoints but no client_id to authorize them — " +
+              "SoundCloud's page layout may have changed. Report it at " +
+              "https://github.com/boy-offi9-inc/tidepull-plugins/issues",
+            );
+          }
           if (clientId) {
             const resolved: Info["formats"] = [];
             for (const f of mediaEndpoints) {

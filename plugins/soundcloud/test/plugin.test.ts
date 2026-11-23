@@ -106,3 +106,40 @@ test("resolves /media/ endpoints via scraped client_id into real stream URLs", a
   assert.equal(f.protocol, "hls");
   assert.equal(f.format_id, "sc-og-audio-resolved");
 });
+
+test("scrapes the inline client_id from the new Next.js page and resolves media endpoints", async () => {
+  const requested: string[] = [];
+  const html = fixture("track.html")
+    .replace(
+      "https://cf-media.example.com/stream/progressive/track-1.128.mp3",
+      "https://api-mobi.soundcloud.com/media/soundcloud:tracks:293/fa250033/stream/hls",
+    )
+    .replace("</body>", '<script>window.__sc_config={"client_id=KKzJxmw11tYpCs6T24P4uUYhqmjalG6M&app_version=1"};</script></body>');
+  const info = await extract(new URL("https://soundcloud.com/a/b"), {
+    ...mockCtx(html, requested),
+    http: {
+      ...mockCtx(html, requested).http,
+      async text(url: string) {
+        requested.push(url);
+        if (url.includes("/media/")) {
+          assert.ok(url.includes("client_id=KKzJxmw11tYpCs6T24P4uUYhqmjalG6M"));
+          return { text: JSON.stringify({ url: "https://playback.media-streaming.soundcloud.cloud/x/aac_160k/y/playlist.m3u8?expires=1" }), finalUrl: url };
+        }
+        return { text: html, finalUrl: url };
+      },
+    },
+  } as never);
+  assert.equal(info.formats[0].protocol, "hls");
+  assert.match(info.formats[0].url, /media-streaming\.soundcloud\.cloud/);
+});
+
+test("fails loudly when /media/ endpoints exist but no client_id can be scraped", async () => {
+  const html = fixture("track.html").replace(
+    "https://cf-media.example.com/stream/progressive/track-1.128.mp3",
+    "https://api-mobi.soundcloud.com/media/soundcloud:tracks:293/fa250033/stream/hls",
+  );
+  await assert.rejects(
+    () => extract(new URL("https://soundcloud.com/a/b"), mockCtx(html)),
+    /no client_id to authorize/,
+  );
+});
