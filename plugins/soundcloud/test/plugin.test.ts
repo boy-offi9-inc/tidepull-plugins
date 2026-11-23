@@ -73,3 +73,36 @@ test("throws a helpful TidepullError when no stream URL is found", async () => {
     /tidepull-plugins\/issues/,
   );
 });
+
+test("resolves /media/ endpoints via scraped client_id into real stream URLs", async () => {
+  const requested: string[] = [];
+  const html = fixture("track.html")
+    .replace(
+      "https://cf-media.example.com/stream/progressive/track-1.128.mp3",
+      "https://api-v2.soundcloud.com/media/soundcloud:tracks:293/fa250033/stream/hls",
+    )
+    .replace("</body>", '<script src="https://a-v2.sndcdn.com/assets/51-a1b2c3-3da69d0a.js"></script></body>');
+  const clientId = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
+  const info = await extract(new URL("https://soundcloud.com/a/b"), {
+    ...mockCtx(html, requested),
+    http: {
+      ...mockCtx(html, requested).http,
+      async text(url: string) {
+        requested.push(url);
+        if (url.includes("/assets/")) {
+          return { text: `window.__sc = { client_id: "${clientId}" };`, finalUrl: url };
+        }
+        if (url.includes("/media/")) {
+          assert.ok(url.includes(`client_id=${clientId}`), "media request must carry client_id");
+          return { text: JSON.stringify({ url: "https://cf-media.example.com/hls/playlist.m3u8" }), finalUrl: url };
+        }
+        return { text: html, finalUrl: url };
+      },
+    },
+  } as never);
+  assert.equal(info.formats.length, 1);
+  const f = info.formats[0];
+  assert.equal(f.url, "https://cf-media.example.com/hls/playlist.m3u8");
+  assert.equal(f.protocol, "hls");
+  assert.equal(f.format_id, "sc-og-audio-resolved");
+});

@@ -1,8 +1,8 @@
 {
   "name": "@boy-offi9-inc/tidepull-plugin-soundcloud",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "Tidepull plugin: extracts progressive stream URLs from public SoundCloud track pages (og:audio, JSON-LD AudioObject, script data). No client_id/OAuth flow.",
+  "description": "Tidepull plugin: extracts stream URLs from public SoundCloud track pages (og:audio, JSON-LD, script data); scrapes the frontend public client_id to resolve /media/ endpoints. No OAuth.",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -2,10 +2,11 @@ import { definePlugin, TidepullError, type Info } from "@boy-offi9-inc/tidepull"
 
 /** Extracts the stream URL from a public SoundCloud track page.
  *
- *  Scope (v0.1.0, honest): public tracks only, and only what is embedded in
- *  the served HTML — og:audio, JSON-LD AudioObject, or the progressive URL in
- *  the page's script data. SoundCloud's API needs a rotating client_id; this
- *  plugin deliberately implements no client_id or OAuth flow (see README).
+ *  Scope (v0.2.0, honest): public tracks only. The page's script data embeds
+ *  `/media/...` endpoints that answer with the real stream location once the
+ *  site's public frontend `client_id` is appended — the same id SoundCloud's
+ *  own web player uses, scraped from the served JS assets. No OAuth, no
+ *  private-content bypass; everything stays on public pages.
  */
 export default definePlugin({
   name: "soundcloud",
@@ -15,7 +16,7 @@ export default definePlugin({
       name: "soundcloud",
       suitable: (url) => suitable(url),
       async extract(url, ctx) {
-        const page = await ctx.http.text(url.href);
+        const page = await ctx.http.text(url.href, { headers: { "user-agent": "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36", "accept-language": "en" } });
         const html = page.text;
         const metas = metaTags(html);
         const metaContent = (prop: string) =>
@@ -42,6 +43,41 @@ export default definePlugin({
           addFormat(formats, JSON.parse(`"${m[1]}"`) as string, url, "script-data", bitrateFrom(m[1]));
         }
 
+        // Media endpoints (/media/.../stream/hls) answer 401 without the frontend's
+        // client_id. Scrape it from the page's own JS assets, then resolve each
+        // endpoint to its real stream URL (progressive file or HLS playlist).
+        const mediaEndpoints = formats.filter((f) => /\/media\/.+\/(?:stream|progressive)/.test(f.url));
+        if (mediaEndpoints.length > 0) {
+          const clientId = await findClientId(html, ctx);
+          if (clientId) {
+            const resolved: Info["formats"] = [];
+            for (const f of mediaEndpoints) {
+              try {
+                const auth = new URL(f.url);
+                auth.searchParams.set("client_id", clientId);
+                const res = await ctx.http.text(auth.href, { headers: { "user-agent": "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36" } });
+                const body = JSON.parse(res.text) as { url?: string };
+                if (typeof body.url !== "string") continue;
+                const isPlaylist = /\.m3u8(?:[?#]|$)/.test(body.url);
+                resolved.push({
+                  format_id: `${f.format_id}-resolved`,
+                  url: body.url,
+                  ext: isPlaylist ? "mp4" : guessExt(body.url),
+                  protocol: isPlaylist ? "hls" : "https",
+                  vcodec: "none",
+                  acodec: isPlaylist ? "unknown" : guessExt(body.url) === "mp3" ? "mp3" : "unknown",
+                  format_note: `${f.format_note} (${isPlaylist ? "hls" : "progressive"})`,
+                  ...(bitrateFrom(f.url) ? { abr: bitrateFrom(f.url) } : {}),
+                });
+              } catch {
+                // endpoint failed (rotated id, regional block) — keep other candidates
+              }
+            }
+            // resolved progressive/HLS beats raw auth-required endpoints
+            if (resolved.length > 0) return finish(url, page.finalUrl || url.href, metaContent, html, resolved);
+          }
+        }
+
         if (formats.length === 0) {
           throw new TidepullError(
             "No stream URL found on the SoundCloud page. Public tracks are usually embedded in the HTML; " +
@@ -50,14 +86,7 @@ export default definePlugin({
           );
         }
 
-        return {
-          id: url.pathname.split("/").filter(Boolean).pop() ?? "track",
-          title: metaContent("og:title") ?? /<title>([^<]*)<\/title>/i.exec(html)?.[1]?.trim() ?? "track",
-          extractor: "soundcloud",
-          webpage_url: page.finalUrl || url.href,
-          thumbnail: metaContent("og:image"),
-          formats: [best(formats)],
-        };
+        return finish(url, page.finalUrl || url.href, metaContent, html, [best(formats)]);
       },
     },
   ],
@@ -114,6 +143,33 @@ function abrOf(f: Info["formats"][number]): number {
 function guessExt(url: string): string {
   const m = /\.(mp3|m4a|aac|ogg|opus)(?:[?#]|$)/i.exec(url);
   return m ? m[1].toLowerCase() : "mp3";
+}
+
+/** SoundCloud's web player ships its public client_id in one of the page's JS assets.
+ *  Scrape the id out of the served scripts (same pattern yt-dlp uses; no OAuth involved). */
+async function findClientId(trackHtml: string, ctx: { http: { text: (url: string, init?: { headers?: Record<string, string> }) => Promise<{ text: string }> } }): Promise<string | undefined> {
+  const scriptSrcs = [...trackHtml.matchAll(/<script[^>]+src="(https:\/\/a-v2\.sndcdn\.com\/assets\/[^"]+\.js)"/g)].map((m) => m[1]).reverse();
+  for (const src of scriptSrcs.slice(0, 15)) {
+    try {
+      const res = await ctx.http.text(src, { headers: { "user-agent": "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36" } });
+      const m = /client_id\s*:\s*"([0-9a-zA-Z]{32})"/.exec(res.text);
+      if (m) return m[1];
+    } catch {
+      // asset fetch failed — try the next one
+    }
+  }
+  return undefined;
+}
+
+function finish(url: URL, finalUrl: string, metaContent: (prop: string) => string | undefined, html: string, formats: Info["formats"]): Info {
+  return {
+    id: url.pathname.split("/").filter(Boolean).pop() ?? "track",
+    title: metaContent("og:title") ?? /<title>([^<]*)<\/title>/i.exec(html)?.[1]?.trim() ?? "track",
+    extractor: "soundcloud",
+    webpage_url: finalUrl,
+    thumbnail: metaContent("og:image"),
+    formats,
+  };
 }
 
 interface MetaTag {

@@ -12,8 +12,10 @@ trust: `og:audio` metas, JSON-LD `AudioObject` (`contentUrl`), then
 
 - **Public tracks only.** Private, members-only and go+ content is never
   touched and cannot be reached this way.
-- **No client_id / OAuth flow.** SoundCloud's API requires a rotating
-  `client_id`; this plugin deliberately implements none — no hardcoded IDs
+- **No OAuth flow.** SoundCloud's `/media/` endpoints need the site's rotating
+  `client_id`; this plugin scrapes the public frontend id from the served JS
+  assets (the same id the SoundCloud web player itself uses, and the technique
+  yt-dlp uses) — no hardcoded IDs, no OAuth, no private-content bypass
   (they break) and no scraping of other clients' IDs. If a track page
   serves its stream only via the JS app, extraction throws a `TidepullError`
   pointing at [tidepull-plugins#issues](https://github.com/boy-offi9-inc/tidepull-plugins/issues).
